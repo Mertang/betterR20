@@ -1029,6 +1029,20 @@ function d20plusEngine () {
 								d20plus.anim.animatorTool.doStartScene(sceneUid);
 							});
 							i();
+						} else if ("name-counter" === e) {
+							// Add Counter to Names
+                            count = 1;
+							const sel = d20.engine.selected();
+							d20.engine.unselect();
+							sel.forEach(it => {
+								d20.engine.select(it);
+                                const name = d20.engine.selected()[0].model.attributes.name
+                                d20.engine.selected()[0].model.set("name", name + ` ${count}`)
+                                d20.engine.selected()[0].model.save()
+								d20.engine.unselect();
+                                count ++;
+							});
+							i();
 						}
 						// END MOD
 						return !1
