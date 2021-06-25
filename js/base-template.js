@@ -211,7 +211,9 @@ const baseTemplate = function () {
 							</ul>
 						</li>
 					<$ } $>
-
+					
+					<li data-action-type='name-counter'>Name Counter</li>
+					
 					<$ if(this.view && this.get && this.get("sides") !== "" && this.get("cardid") === "") { $>
 						<li class='head hasSub' data-menuname='mutliside'>
 							Multi-Sided &raquo;
