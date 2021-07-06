@@ -951,6 +951,42 @@ const betteR205etoolsMain = function () {
 			// player-only HTML if required
 		}
 
+		$body.append(d20plus.importPasteHTML);
+
+		$("#d20plus-importpaste").dialog({
+			autoOpen: false,
+			resizable: true,
+			width: 550,
+			height: 600
+		});
+
+		const $wrpPasteImport = $(`
+		<div style="padding: 0 10px">
+			<button id="b20-paste-import-open-button" class="btn" href="#" title="A tool for importing copied data(JSON) from 5e.tools homebrew builder" style="margin-top: 5px">Fast Homebrew Import</button>
+				<div style="clear: both"></div>
+			<hr></hr>
+		</div>`);
+
+		$wrpPasteImport.find("#b20-paste-import-open-button").on("click", () => {
+			$("#d20plus-importpaste").dialog("open");
+		});
+
+		$(`#journal`).prepend($wrpPasteImport);
+
+		$(`#import-paste-start`).bind("click", function () {
+			$("#d20plus-importpaste").dialog("close");
+			const $txtarea = $("#d20plus-importpaste").find(`textarea`)
+			const data = JSON.parse($txtarea.val());
+			const overwrite = $("#import-paste-overwrite").prop("checked");
+			const inJournals = $("#import-paste-showplayers").prop("checked") ? "all" : "";
+
+			//this is sloppy af. looking for a better way
+			if (data.hp) d20plus.monsters.handoutBuilder(data, overwrite , inJournals , "", undefined, {});
+			if (data.time) d20plus.spells.handoutBuilder(data, overwrite , inJournals , "", undefined, {});
+
+			$txtarea.val("");
+		})
+
 		$body.append(d20plus.playerImportHtml);
 		const $winPlayer = $("#d20plus-playerimport");
 		const $appTo = $winPlayer.find(`.append-target`);
@@ -977,7 +1013,6 @@ const betteR205etoolsMain = function () {
 				<h3 style="margin-bottom: 4px">BetteR20</h3>
 				<button id="b20-temp-import-open-button" class="btn" href="#" title="A tool to import temporary copies of various things, which can be drag-and-dropped to character sheets." style="margin-top: 5px">Temp Import Spells, Items, Classes,...</button>
 					<div style="clear: both"></div>
-				<hr></hr>
 			</div>`);
 
 		$wrpPlayerImport.find("#b20-temp-import-open-button").on("click", () => {
@@ -3310,6 +3345,27 @@ const betteR205etoolsMain = function () {
 </p>
 <button type="button" id="importstart" class="btn" role="button" aria-disabled="false">
 <span>Start Import</span>
+</button>
+</div>`;
+
+	d20plus.importPasteHTML = `<div id="d20plus-importpaste" title="BetteR20 - Fast HomeBrew Import from 5e.tools" style="width: 500px;">
+<p style="display: flex"> How to use this tool:
+<ol>
+  <li>Go Homebrew Builder at 5e.tools.</li>
+  <li>Create the monster/spell you want to import.</li>
+  <li>Click the <i>"Data"</i> tab above the creature/spell info and then <i>"Copy Code"</i>.</li>
+  <li>Paste the data in the text box below and click the <i>"Import"</i> button.</li>
+</ol> 
+</p>
+<p>
+	<textarea class="paste" placeholder="Paste Data Here" style="width: 500px; height: 280px;"></textarea>
+</p>
+<p id="import-paste-options">
+<label style="padding-top: 5px;">Make handouts visible to all players? <input type="checkbox" title="Make items visible to all players" id="import-paste-showplayers"></label>
+<label>Overwrite existing? <input type="checkbox" title="Overwrite existing" id="import-paste-overwrite" checked></label>
+</p>
+<button type="button" id="import-paste-start" class="btn" role="button" aria-disabled="false">
+<span>Import</span>
 </button>
 </div>`;
 
