@@ -1172,6 +1172,23 @@ const betteR205etoolsMain = function () {
 				}
 			}
 
+			increaseOrEditValues (name, curOpts, maxOpts ) {
+				const attrib = this.findByName(name);
+				let newCurr = undefined;
+				let newMax = undefined;
+
+				if (curOpts.regex) newCurr = (attrib.current || curOpts.baseVal).replace(curOpts.regex, curOpts.value)
+				else newCurr = Number(attrib.current || curOpts.baseVal) + curOpts.value;
+				
+				if (maxOpts && maxOpts.value) {
+					if (maxOpts.regex) newMax = (attrib.max || maxOpts.baseVal).replace(maxOpts.regex, maxOpts.value)
+					else newMax = Number(attrib.max || maxOpts.baseVal) + maxOpts.value;	
+				}
+
+				this.addOrUpdate (name, newCurr, newMax)
+				return {name: name, newCurrent: newCurr, ...(newMax == undefined ? {} : {newMax: newMax})}
+			}
+			
 			notifySheetWorkers () {
 				d20.journal.notifyWorkersOfAttrChanges(this.character.model.id, this._changedAttrs);
 				this._changedAttrs = [];
@@ -1550,7 +1567,7 @@ const betteR205etoolsMain = function () {
 			attrs.notifySheetWorkers();
 		}
 
-		function importRace (character, data) {
+		function importRace (character, data, event) {
 			const renderer = new Renderer();
 			renderer.setBaseUrl(BASE_SITE_URL);
 
@@ -1564,10 +1581,34 @@ const betteR205etoolsMain = function () {
 
 			const attrs = new CharacterAttributesProxy(character);
 
+			function parseProfName (name, count, category) {
+				const out = [];
+				if (name.includes("|")) {
+					out.push(name.split("|")[0])
+				} else if (name === "anystandard") {
+					out.push(name)
+				} else {
+					out.push(name)
+				}
+				return out;
+			}
+
 			if (d20plus.sheet === "ogl") {
 				attrs.addOrUpdate(`race`, race.name);
 				attrs.addOrUpdate(`race_display`, race.name);
 				attrs.addOrUpdate(`speed`, Parser.getSpeedString(race));
+
+				if (race.ability && race.ability.length) {
+					for (let [ab, num] of Object.entries(race.ability[0])) {
+						if (ab === "choose") {
+							continue
+						} else { 
+							const abFull = Parser.attAbvToFull(ab).toLowerCase();
+							const newAbObj = attrs.increaseOrEditValues(abFull, {value: num, baseVal:10})
+							attrs.addOrUpdate(abFull + "_base", newAbObj.newCurrent.toString())
+						}
+					}
+				}
 
 				race.entries.filter(it => it.text).forEach(e => {
 					const fRowId = d20plus.ut.generateRowId();
@@ -1576,18 +1617,121 @@ const betteR205etoolsMain = function () {
 					attrs.add(`repeating_traits_${fRowId}_source_type`, race.name);
 					attrs.add(`repeating_traits_${fRowId}_description`, e.text);
 					attrs.add(`repeating_traits_${fRowId}_options-flag`, "0");
-					if (race._baseName === "Halfling" && e.name === "Lucky") attrs.addOrUpdate(`halflingluck_flag`, "1");
+
+					const luckyRaces = ["Halfling", "Kor"]
+					if ( (luckyRaces.includes(race._baseName) || luckyRaces.includes(race.name)) && e.name === "Lucky") attrs.addOrUpdate(`halflingluck_flag`, "1");
 				});
 
-				if (race.languageProficiencies && race.languageProficiencies.length) {
-					// FIXME this discards information
-					const profs = race.languageProficiencies[0];
-					const asText = Object.keys(profs).filter(it => it !== "choose").map(it => it === "anyStandard" ? "any" : it).map(it => it.toTitleCase()).join(", ");
-
-					const lRowId = d20plus.ut.generateRowId();
-					attrs.add(`repeating_proficiencies_${lRowId}_name`, asText);
-					attrs.add(`repeating_proficiencies_${lRowId}_options-flag`, "0");
+				const proficiencies = {
+					weaponProficiencies: "WEAPON",
+					armorProficiencies: "ARMOR",
+					languageProficiencies: "LANGUAGE"
 				}
+
+				for (let [profKey, profType] of Object.entries(proficiencies)) {
+					if (race[profKey] && race[profKey].length) {
+
+						// FIXME this discards information
+						const profs = race[profKey][0];
+
+						for (let [prof, profVal] of Object.entries(profs)) {
+							const profNames = parseProfName(prof, profVal, profType);
+							for (let profName of profNames){
+								const rowId = d20plus.ut.generateRowId();
+								attrs.add(`repeating_proficiencies_${rowId}_prof_type`, profType);
+								attrs.add(`repeating_proficiencies_${rowId}_name`, profName.toTitleCase());
+								attrs.add(`repeating_proficiencies_${rowId}_options-flag`, "0");
+							}							
+						}
+					}
+				}
+
+				function parseSpellAbility (ability) {
+					if (!ability) return "spell"	
+					const abAbv = (ability === 'choose') ? 1 : ability;
+					const abFull = Parser.attAbvToFull(abAbv).toLowerCase();
+					return `@{${abFull}_mod}+`
+				}
+
+				function getAllSpells () {
+					return new Promise(async resolve => {
+						const toLoad = Object.keys(spellDataUrls).filter(src => !SourceUtil.isNonstandardSource(src)).map(src => d20plus.spells.formSpellUrl(spellDataUrls[src]));
+						const dataStack = (await Promise.all(toLoad.map(async url => DataUtil.loadJSON(url)))).flat().map(i=>i.spell).flat();
+						resolve (dataStack)
+					})
+				}
+
+				function getInnateSpellData (name, infos, allSpells) {
+					const info = MiscUtil.copy(infos)
+
+					if (name.includes("#")) [name, info.castlvl] = name.split('#')
+					else if (name.includes("|")) [name, info.source] = name.split('|')
+
+					const spell = allSpells.find(spell => spell.name.toLowerCase() === name.toLowerCase());
+					const [notecontents, gmnotes] = d20plus.spells._getHandoutData(spell);
+					const data = JSON.parse(gmnotes)
+					info.spelllevel = data.data.Level;
+
+					return {data, info}
+				}
+
+				// innateDepthStructure 
+				// 	0: "level"
+				// 	1: "regain"
+				// 	2: "times"
+				function recursiveReadInnate (data, depth = 0, info = {}, out = []) {
+					if (data instanceof Array){
+						out.push({data: data, info: MiscUtil.copy(info)})
+					}
+					else {
+						for (let [key, val] of Object.entries(data)){
+							info[depth] = key;
+							const i = Number(depth) + 1;
+							recursiveReadInnate (val, i, info, out)
+						}
+					}
+					return out;
+				}
+
+				if (race.additionalSpells && race.additionalSpells.length) {
+					const innate = race.additionalSpells[0].innate;
+					const spellAbility = parseSpellAbility(race.additionalSpells[0].ability);	
+					const charLVL = Number(attrs.findByName("level").current) || 1;
+					const spellsToAdd = [];
+
+					getAllSpells().then(allSpells =>{	
+						if (innate) {
+							const spells = recursiveReadInnate(innate)
+							spells.forEach(({data, info}) => {
+								// if (Number(info[0]) > charLVL) continue;
+								data.forEach(name => {
+									spellsToAdd.push(getInnateSpellData(name, info, allSpells))
+								})
+							})
+							}
+
+						const spellsData = spellsToAdd.map(s => s.data)						
+						importMultiple(attrs.character, spellsData, event).then(async () => {
+							spellsToAdd.forEach(spell => {
+								console.log(spell)
+								const splvltext = spell.info.spelllevel === '0'? 'cantrip' : spell.info.spelllevel
+								const rowId = attrs.findOrGenerateRepeatingRowId(`repeating_spell-${splvltext}_$0_spellname`, spell.data.name.toTitleCase())
+								let innatetxt = "";	
+								
+								if (spell.info[1] === "_") innatetxt += "at will"
+								else if (spell.info[1] === "daily") innatetxt += spell.info.times + "/day"
+								else innatetxt += spell.info.times + "/rest"
+								
+	
+								if (spell.info.castlvl) innatetxt += ` @lvl${spell.info.castlvl}`
+	
+								attrs.addOrUpdate(`repeating_spell-${splvltext}_${rowId}_innate`, innatetxt)
+								attrs.addOrUpdate(`repeating_spell-${splvltext}_${rowId}_spell_ability`, spellAbility)
+							})
+						})
+					}) 								
+				} 
+
 			} else if (d20plus.sheet === "shaped") {
 				attrs.addOrUpdate("race", race.name);
 				attrs.addOrUpdate("size", (race.size || [SZ_VARIES]).map(sz => Parser.sizeAbvToFull(sz)).join("/").toUpperCase());
@@ -2258,6 +2402,14 @@ const betteR205etoolsMain = function () {
 			d20plus.importer.doFakeDrop(event, character, data, null);
 		}
 
+		async function importMultiple (character, items, event) { 
+			const interval = d20plus.cfg.get("import", "importIntervalHandout") || d20plus.cfg.getDefault("import", "importIntervalHandout");
+			for(let i = 0; i < items.length; i++) {
+				importData(character, items[i], event);
+				await MiscUtil.pDelay(interval)
+			}
+		}
+
 		function importData (character, data, event) {
 			// TODO remove feature import workarounds below when roll20 and sheets supports their drag-n-drop properly
 			if (data.data.Category === "Feats") {
@@ -2265,7 +2417,7 @@ const betteR205etoolsMain = function () {
 			} else if (data.data.Category === "Backgrounds") {
 				importBackground(character, data);
 			} else if (data.data.Category === "Races") {
-				importRace(character, data);
+				importRace(character, data, event);
 			} else if (data.data.Category === "Optional Features") {
 				importOptionalFeature(character, data);
 			} else if (data.data.Category === "Classes") {
@@ -2955,7 +3107,7 @@ const betteR205etoolsMain = function () {
 		renderer.recursiveRender({entries: data.entries}, renderStack, {depth: 1});
 
 		const rendered = renderStack.join("");
-		const prereqs = Renderer.utils.getPrerequisiteText(data.prerequisites);
+		const prereqs = Renderer.utils.getPrerequisiteHtml(data.prerequisites);
 
 		const r20json = {
 			"name": data.name,
