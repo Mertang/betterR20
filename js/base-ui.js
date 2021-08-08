@@ -237,8 +237,8 @@ function baseUi () {
 			const countCheck = {};
 
 			const $dialog = $(`
-			<div title="Import Configuration">
-				<p class="bold">Please choose what elements you want to import/update</p>
+			<div class="window-title" title="${data.name} - Import Configuration">
+				<h4 style="text-align: center;">Please choose what elements you want to import/update</h4>
 				<hr>
 				${properties.map(prop => `
 				<div class="${prop.name}-container" style="display: none">
@@ -294,12 +294,20 @@ function baseUi () {
 							chooseNum = val[0].anyStandard || 1;
 
 							html += ` plus ${chooseNum} of the following:` 
+
+							//Standard Languages
 							html += `
 							<div style="display: flex;">
 								<div style="padding-right: 25px;"> Standard${Parser.LANGUAGES_STANDARD.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
-								<div style="padding-right: 25px;"> Exotic${Parser.LANGUAGES_EXOTIC.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
-								<div> Secret${Parser.LANGUAGES_SECRET.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
 							</div>`
+
+							// //All Languages
+							// html += `
+							// <div style="display: flex;">
+							// 	<div style="padding-right: 25px;"> Standard${Parser.LANGUAGES_STANDARD.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
+							// 	<div style="padding-right: 25px;"> Exotic${Parser.LANGUAGES_EXOTIC.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
+							// 	<div> Secret${Parser.LANGUAGES_SECRET.filter(lang => !val[0][lang.toLowerCase()]).map(lang => `<label><input data-${varToProp(key)}="${lang}" type='checkbox'/> ${lang}</label>`).join('')}</div>
+							// </div>`
 						}
 						appendToDialog (key, html, chooseNum)
 						break;
