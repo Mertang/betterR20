@@ -202,8 +202,6 @@ function baseUi () {
 
 	d20plus.ui.importConfigurator = async function (data) {
 		return new Promise((resolve, reject) => {
-			const toReturn = MiscUtil.copy(data);
-
 			//Render all the properties hidden to stay in order.
 			const properties = 
 			[{
@@ -235,6 +233,8 @@ function baseUi () {
 				display: 'Feats <i>(Hover for info)</i>',
 				help: 'Adds feats'
 			}]
+
+			const countCheck = {};
 
 			const $dialog = $(`
 			<div title="Import Configuration">
@@ -401,13 +401,23 @@ function baseUi () {
 									}
 								}
 							}
+
+							let isCountRight = true;
+
+							for (let [group, count] of Object.entries(countCheck)) {
+								if (getSelected(group).length === count) continue
+								else {
+									isCountRight = false;
+									break;
+								}
+							}
 							
-							if (true) {
+							if (isCountRight) {
 								$(this).dialog("close");
 								$dialog.remove();
 								resolve(output);
 							} else {
-								alert(messageCountIncomplete ?? "Please select more options!");
+								alert("You have not selected all the available options!");
 							}
 						}
 					}
@@ -415,11 +425,6 @@ function baseUi () {
 				width: 600,
 				height : 700
 			})
-
-			console.log($dialog.find(`input[type="checkbox"]`).map((i, e) => ({
-				choice: $(e).data(),
-				selected: $(e).prop("checked")
-			})).get())
 
 			function getSelected(group) {
 				return $dialog.find(`input[data-${varToProp(group)}]`).map((i, e) => ({
@@ -429,6 +434,7 @@ function baseUi () {
 			}
 			
 			function applyCount(group, count) {
+				countCheck[group] = count;
 				$dialog.find(`input[data-${varToProp(group)}]`).on("change", function() {
 					const $e = $(this);
 					let selectedCount = getSelected(group).length;
