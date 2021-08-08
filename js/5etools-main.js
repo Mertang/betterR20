@@ -1567,7 +1567,7 @@ const betteR205etoolsMain = function () {
 			attrs.notifySheetWorkers();
 		}
 
-		function importRace (character, data, event) {
+		async function importRace (character, data, event) {
 			const renderer = new Renderer();
 			renderer.setBaseUrl(BASE_SITE_URL);
 
@@ -1578,6 +1578,10 @@ const betteR205etoolsMain = function () {
 				renderer.recursiveRender({entries: e.entries}, renderStack);
 				e.text = d20plus.importer.getCleanText(renderStack.join(""));
 			});
+
+			const filteredData = await d20plus.ui.importConfigurator(race)
+
+			console.log(filteredData)
 
 			const attrs = new CharacterAttributesProxy(character);
 
@@ -1594,11 +1598,12 @@ const betteR205etoolsMain = function () {
 			}
 
 			if (d20plus.sheet === "ogl") {
-				attrs.addOrUpdate(`race`, race.name);
-				attrs.addOrUpdate(`race_display`, race.name);
-				attrs.addOrUpdate(`speed`, Parser.getSpeedString(race));
+				attrs.addOrUpdate(`race`, filteredData.name);
+				attrs.addOrUpdate(`race_display`, filteredData.name);
 
-				if (race.ability && race.ability.length) {
+				if (filteredData.speed) attrs.addOrUpdate(`speed`, Parser.getSpeedString(race));
+
+				if (filteredData.ability) {
 					for (let [ab, num] of Object.entries(race.ability[0])) {
 						if (ab === "choose") {
 							continue
@@ -1610,17 +1615,19 @@ const betteR205etoolsMain = function () {
 					}
 				}
 
-				race.entries.filter(it => it.text).forEach(e => {
-					const fRowId = d20plus.ut.generateRowId();
-					attrs.add(`repeating_traits_${fRowId}_name`, e.name);
-					attrs.add(`repeating_traits_${fRowId}_source`, "Race");
-					attrs.add(`repeating_traits_${fRowId}_source_type`, race.name);
-					attrs.add(`repeating_traits_${fRowId}_description`, e.text);
-					attrs.add(`repeating_traits_${fRowId}_options-flag`, "0");
+				if (filteredData.entries) {
+					filteredData.entries.filter(it => it.text).forEach(e => {
+						const fRowId = d20plus.ut.generateRowId();
+						attrs.add(`repeating_traits_${fRowId}_name`, e.name);
+						attrs.add(`repeating_traits_${fRowId}_source`, "Race");
+						attrs.add(`repeating_traits_${fRowId}_source_type`, filteredData.name);
+						attrs.add(`repeating_traits_${fRowId}_description`, e.text);
+						attrs.add(`repeating_traits_${fRowId}_options-flag`, "0");
 
-					const luckyRaces = ["Halfling", "Kor"]
-					if ( (luckyRaces.includes(race._baseName) || luckyRaces.includes(race.name)) && e.name === "Lucky") attrs.addOrUpdate(`halflingluck_flag`, "1");
-				});
+						const luckyRaces = ["Halfling", "Kor"]
+						if ( (luckyRaces.includes(filteredData._baseName) || luckyRaces.includes(filteredData.name)) && e.name === "Lucky") attrs.addOrUpdate(`halflingluck_flag`, "1");
+					});
+				}
 
 				const proficiencies = {
 					weaponProficiencies: "WEAPON",
@@ -1629,28 +1636,24 @@ const betteR205etoolsMain = function () {
 				}
 
 				for (let [profKey, profType] of Object.entries(proficiencies)) {
-					if (race[profKey] && race[profKey].length) {
+					if (filteredData[profKey]) {
 
-						// FIXME this discards information
-						const profs = race[profKey][0];
+						const profs = filteredData[profKey][0];
 
 						for (let [prof, profVal] of Object.entries(profs)) {
-							const profNames = parseProfName(prof, profVal, profType);
-							for (let profName of profNames){
-								const rowId = d20plus.ut.generateRowId();
-								attrs.add(`repeating_proficiencies_${rowId}_prof_type`, profType);
-								attrs.add(`repeating_proficiencies_${rowId}_name`, profName.toTitleCase());
-								attrs.add(`repeating_proficiencies_${rowId}_options-flag`, "0");
-							}							
-						}
+							const profName = prof.includes("|") ? prof.split("|")[0] : prof
+							const rowId = d20plus.ut.generateRowId();
+							attrs.add(`repeating_proficiencies_${rowId}_prof_type`, profType);
+							attrs.add(`repeating_proficiencies_${rowId}_name`, profName.toTitleCase());
+							attrs.add(`repeating_proficiencies_${rowId}_options-flag`, "0");
+						}							
 					}
 				}
+				
 
 				function parseSpellAbility (ability) {
-					if (!ability) return "spell"	
-					const abAbv = (ability === 'choose') ? 1 : ability;
-					const abFull = Parser.attAbvToFull(abAbv).toLowerCase();
-					return `@{${abFull}_mod}+`
+					if (!ability) return "spell"			
+					return `@{${Parser.attAbvToFull(ability).toLowerCase()}_mod}+`
 				}
 
 				function getAllSpells () {
@@ -1681,6 +1684,7 @@ const betteR205etoolsMain = function () {
 				// 	2: "times"
 				function recursiveReadInnate (data, depth = 0, info = {}, out = []) {
 					if (data instanceof Array){
+						if (depth === 1) info[depth] = '_';
 						out.push({data: data, info: MiscUtil.copy(info)})
 					}
 					else {
@@ -1693,9 +1697,9 @@ const betteR205etoolsMain = function () {
 					return out;
 				}
 
-				if (race.additionalSpells && race.additionalSpells.length) {
-					const innate = race.additionalSpells[0].innate;
-					const spellAbility = parseSpellAbility(race.additionalSpells[0].ability);	
+				if (filteredData.additionalSpells) {
+					const innate = filteredData.additionalSpells[0].innate;
+					const spellAbility = parseSpellAbility(filteredData.additionalSpells[0].ability);	
 					const charLVL = Number(attrs.findByName("level").current) || 1;
 					const spellsToAdd = [];
 
@@ -1719,8 +1723,9 @@ const betteR205etoolsMain = function () {
 								let innatetxt = "";	
 								
 								if (spell.info[1] === "_") innatetxt += "at will"
-								else if (spell.info[1] === "daily") innatetxt += spell.info.times + "/day"
-								else innatetxt += spell.info.times + "/rest"
+								else if (spell.info[1] === "ritual") innatetxt += "as ritual"								
+								else if (spell.info[1] === "daily") innatetxt += spell.info[2] + "/day"
+								else innatetxt += spell.info[2] + "/rest"
 								
 	
 								if (spell.info.castlvl) innatetxt += ` @lvl${spell.info.castlvl}`
