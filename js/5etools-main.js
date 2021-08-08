@@ -1172,22 +1172,10 @@ const betteR205etoolsMain = function () {
 				}
 			}
 
-			increaseOrEditValues (name, curOpts, maxOpts ) {
+			getCurrent (name) {
 				const attrib = this.findByName(name);
-				let newCurr = undefined;
-				let newMax = undefined;
-
-				if (curOpts.regex) newCurr = (attrib.current || curOpts.baseVal).replace(curOpts.regex, curOpts.value)
-				else newCurr = Number(attrib.current || curOpts.baseVal) + curOpts.value;
-				
-				if (maxOpts && maxOpts.value) {
-					if (maxOpts.regex) newMax = (attrib.max || maxOpts.baseVal).replace(maxOpts.regex, maxOpts.value)
-					else newMax = Number(attrib.max || maxOpts.baseVal) + maxOpts.value;	
-				}
-
-				this.addOrUpdate (name, newCurr, newMax)
-				return {name: name, newCurrent: newCurr, ...(newMax == undefined ? {} : {newMax: newMax})}
-			}
+				return attrib ? attrib.current : undefined
+			}			
 			
 			notifySheetWorkers () {
 				d20.journal.notifyWorkersOfAttrChanges(this.character.model.id, this._changedAttrs);
@@ -1604,14 +1592,11 @@ const betteR205etoolsMain = function () {
 				if (filteredData.speed) attrs.addOrUpdate(`speed`, Parser.getSpeedString(race));
 
 				if (filteredData.ability) {
-					for (let [ab, num] of Object.entries(race.ability[0])) {
-						if (ab === "choose") {
-							continue
-						} else { 
-							const abFull = Parser.attAbvToFull(ab).toLowerCase();
-							const newAbObj = attrs.increaseOrEditValues(abFull, {value: num, baseVal:10})
-							attrs.addOrUpdate(abFull + "_base", newAbObj.newCurrent.toString())
-						}
+					for (let [ab, num] of Object.entries(filteredData.ability[0])) {
+						const abFull = Parser.attAbvToFull(ab).toLowerCase();
+						const newAb = (attrs.getCurrent(abFull) || 10) + num;
+						attrs.addOrUpdate(abFull, newAb)
+						attrs.addOrUpdate(abFull + "_base", newAb.toString())
 					}
 				}
 

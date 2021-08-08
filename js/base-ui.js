@@ -275,7 +275,7 @@ function baseUi () {
 
 							if (val[0].choose) {
 								chooseNum = val[0].choose.count || 1;
-								html += ` plus +1 in ${chooseNum} of the following:` + val[0].choose.from.map(ab => `<label><input data-${varToProp(key)}="${Parser.attAbvToFull(ab).toLowerCase()}" type='checkbox'/> ${Parser.attAbvToFull(ab)}</label>`).join("")
+								html += ` plus +1 in ${chooseNum} of the following:` + val[0].choose.from.map(ab => `<label><input data-${varToProp(key)}="${ab}" type='checkbox'/> ${Parser.attAbvToFull(ab)}</label>`).join("")
 							}
 						appendToDialog (key, html, chooseNum)
 						break;
