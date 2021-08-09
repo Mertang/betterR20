@@ -2396,7 +2396,7 @@ const betteR205etoolsMain = function () {
 			const interval = d20plus.cfg.get("import", "importIntervalHandout") || d20plus.cfg.getDefault("import", "importIntervalHandout");
 			for(let i = 0; i < items.length; i++) {
 				importData(character, items[i], event);
-				await MiscUtil.pDelay(interval)
+				await MiscUtil.pDelay(interval * 5)
 			}
 		}
 
